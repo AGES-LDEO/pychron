@@ -40,7 +40,7 @@ class Gauge(BaseGauge):
         return v
 
 
-class PfiefferMaxiGaugeController(BaseGaugeController, CoreDevice):
+class PfeifferMaxiGaugeController(BaseGaugeController, CoreDevice):
     gauge_klass = Gauge
     scan_func = 'update_pressures'
 
