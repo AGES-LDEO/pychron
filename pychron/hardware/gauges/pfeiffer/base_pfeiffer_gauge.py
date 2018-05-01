@@ -1,11 +1,11 @@
 # ===============================================================================
-# Copyright 2011 Jake Ross
+# Copyright 2018 ross
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
-#   http://www.apache.org/licenses/LICENSE-2.0
+# http://www.apache.org/licenses/LICENSE-2.0
 #
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
@@ -14,8 +14,6 @@
 # limitations under the License.
 # ===============================================================================
 
-
-
 # ============= enthought library imports =======================
 
 # ============= standard library imports ========================
@@ -23,7 +21,6 @@
 # ============= local library imports  ==========================
 
 # ============= views ===================================
-from __future__ import absolute_import
 from pychron.hardware.gauges.base_gauge import BaseGauge
 
 
@@ -33,48 +30,46 @@ class BasePfeifferGauge(BaseGauge):
 
         if typetag == 'pressure':
             s = 'PR'
-        rs = '%s%s;CR' % (s, addr)
+        rs = '{}{};'.format(s, addr)
         return rs
 
     def _build_command(self, addr, typetag, value):
 
-        base = '%s,%s,%s,%s,%s,%s,%s;CR'
+        base = '{},{},{},{},{},{},{};'
         if typetag == 'power':
             tag = 'SEN'
-            if value == 'On' or 'on' or '2':
+
+            if value.lower() in ('on', '2'):
                 value = '2'
-            elif value == 'Off' or 'off' or '1':
+            elif value.lower() in ('off', '1'):
                 value = '1'
-            else:
-                value = '0'
-            s = base % ((tag,) + (tuple([(value if addr == i else '0') for i in range(6)])))
         elif typetag == 'degas':
             tag = 'DGS'
-            if value == 'On' or 'on' or '1':
+            if value.lower() in ('on', '1'):
                 value = '1'
-            elif value == 'Off' or 'off' or '0':
+            elif value in ('off', '0'):
                 value = '0'
-            else:
-                value = '0'
-            s = base % ((tag,) + (tuple([(value if addr == i else '0') for i in range(6)])))
-        return s
+        else:
+            return
+
+        return base.format(tag, *[(value if addr == i else '0') for i in range(6)])
 
     def _parse_response(self, type_, raw):
-        '''
+        """
         parse a serial response
-        
+
         @type_ type_: C{str}
         @param type_: the response type_
         @type_ raw: C{str}
         @param raw: the raw response C{str}
         @rtype: C{str or boolean}
         @return: a float for pressure, boolean otherwise
-        '''
+        """
+
         if self.simulation:
             return float(self.get_random_value(0, 10))
 
-
-        if raw == None:
+        if raw is None:
             return
 
         data = raw.split(';')
@@ -83,12 +78,12 @@ class BasePfeifferGauge(BaseGauge):
         value = data[i]
         si = value.find('ACK')
         if si == -1:
-            self.warning('%s' % raw)
+            self.warning('{}'.format(raw))
             return
         else:
             si += 3
 
-        if type_ in ['pressure', 'setpoint_value']:
+        if type_ in ('pressure', 'setpoint_value'):
             v = value[si:]
             try:
 
@@ -97,7 +92,7 @@ class BasePfeifferGauge(BaseGauge):
                 self.warning(e)
                 return
 
-        elif type_ in ['filament', 'setpoint_enable']:
-            return True if value[si:] == 'ON' else False
+        elif type_ in ('filament', 'setpoint_enable'):
+            return value[si:] == 'ON'
 
 # ============= EOF ====================================

@@ -13,18 +13,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===============================================================================
-from __future__ import absolute_import
 from traitsui.api import View, Item, HGroup, Group, ListEditor, InstanceEditor
 
 from pychron.core.ui.color_map_bar_editor import BarGaugeEditor
 from pychron.hardware.core.core_device import CoreDevice
 from pychron.hardware.gauges.base_controller import BaseGauge, BaseGaugeController
-import re
 import six
 
-ACK_RE = re.compile(r'@\d\d\dACK(?P<value>\d+.\d\dE-*\d\d);FF')
-LO_RE = re.compile(r'@\d\d\dACKLO<E-11;FF')
-NO_GAUGE_RE = re.compile(r'@\d\d\dACKNO_GAUGE;FF')
 
 class Gauge(BaseGauge):
     def traits_view(self):
@@ -45,63 +40,36 @@ class Gauge(BaseGauge):
         return v
 
 
-class PfeifferMaxiGaugeController(BaseGaugeController, CoreDevice):
+class MaxiPfiefferController(BaseGaugeController, CoreDevice):
     gauge_klass = Gauge
     scan_func = 'update_pressures'
 
-    # def initialize(self, *args, **kw):
-    #     for g in self.gauges:
-    #         if int(g.channel) in (1,3,5):
-    #             self._power_onoff(g.channel, True, verbose=True)
-    #     return True
-
-    def pfeiffer_ask(self, cmd)
-        r = self.ask(cmd)
-        if r == 'ACK':
-            r = self.ask('ENQ')
-        r = self._parse_response(r)
-        return r
+    def initialize(self, *args, **kw):
+        return True
 
     def get_pressures(self, verbose=False):
-        r = self._read_pressure(verbose=verbose)
-        return r
+        # this could be moved to BaseGaugeController
+        self.update_pressures()
+        return [g.pressure for g in self.gauges]
 
-    def _power_onoff(self, ch, state, verbose=False):
-        cmd = 'CP{}!{}'.format(ch, 'ON' if state else 'OFF')
-        cmd = self._build_command(cmd)
-        self.ask(cmd, verbose=verbose)
+    def _read_pressure(self, name=None, verbose=False):
+        if name is not None:
+            gauge = name
+            if isinstance(gauge, (str, six.text_type)):
+                gauge = self.get_gauge(name)
+            channel = gauge.channel
+        else:
+            channel = 'Z'
 
-    def _read_pressure(self, gauge, verbose=False):
-        channel = gauge.channel
         key = 'PR'
-        cmd = self._build_command(key, channel)
+        cmd = '%s%s\r' % (key, channel)
 
-        r = self.pfeiffer_ask(cmd, verbose=verbose)
-        r = self._parse_response(r, name)
-        return r
+        r = self.ask(cmd, verbose=verbose)
+        if r == 'ACK':
+            r = self.ask('ENQ', verbose=verbose)
 
-        # r = r.split('ACK')
-        # r = r[1]
-        # r = r.split(';')
-        # r = r[0]
-        #
-        # if ' ' in r:
-        #     try:
-        #         return map(float, r.split(' '))
-        #     except ValueError:
-        #         pass
-        # else:
-        #     try:
-        #         return float(r)
-        #         print(float(r))
-        #     except ValueError:
-        #         pass
-
-    def _build_query(self, cmd):
-        return self._build_command('{}?'.format(cmd))
-
-    def _build_command(self, cmd):
-        return '@{}{};FF'.format(self.address, cmd)
+        pressure = self._parse_response(r)
+        return pressure
 
     def load_additional_args(self, config, *args, **kw):
         self.address = self.config_get(config, 'General', 'address', optional=False)
