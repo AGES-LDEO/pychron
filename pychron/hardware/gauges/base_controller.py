@@ -39,6 +39,11 @@ class BaseGaugeController(HasTraits):
 
     scan_func = 'update_pressures'
 
+    def get_pressures(self, force=False):
+        if force:
+            self.update_pressures()
+        return [g.pressure for g in self.gauges]
+
     def update_pressures(self, verbose=False):
         if verbose:
             self.debug('update pressures')
