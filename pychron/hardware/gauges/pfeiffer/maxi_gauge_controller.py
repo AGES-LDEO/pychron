@@ -63,12 +63,13 @@ class PfeifferMaxiGaugeController(BaseGaugeController, CoreDevice):
 
         key = 'PR'
         cmd = '%s%s\r' % (key, channel)
-
         r = self.ask(cmd, verbose=verbose)
-        if r == 'ACK':
-            r = self.ask('ENQ', verbose=verbose)
-
-        pressure = self._parse_response(r)
+        if chr(6) in r:
+            r = self.ask('\x05\r', verbose=verbose)
+            pressure = r.split(',')[1].rstrip('\r\n')
+        # pressure = self._parse_response(r)
+        else:
+            pressure = 'err'
         return pressure
 
     def load_additional_args(self, config, *args, **kw):
