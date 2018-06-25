@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===============================================================================
-from traits.api import Enum, Float, Property, List
+from traits.api import Enum, Float, Property, List, HasTraits, Str, Int
 from pychron.hardware import get_float
 from pychron.hardware.core.core_device import CoreDevice
 import re
@@ -38,16 +38,22 @@ class RangeTest:
             return self._r
 
 
-class BaseLakeShoreController(CoreDevice):
-    units = Enum('C', 'K')
-    scan_func = 'update'
+class LakeShoreDevice(HasTraits):
+    address = Int
+    setpoint = Float
+    setpoint_readback = Float
+    input_readback = Float
+    threshold = 1
 
-    input_a = Float
-    input_b = Float
-    setpoint1 = Float(auto_set=False, enter_set=True)
-    setpoint1_readback = Float
-    setpoint2 = Float(auto_set=False, enter_set=True)
-    setpoint2_readback = Float
+    def setpoint_achieved(self, controller, threshold=None):
+        if threshold is None:
+            threshold = self.threshold
+        v = controller.read_input(self.address)
+        return abs(v - self.setpoint) > threshold
+
+
+class LakeShoreController(CoreDevice):
+    devices = List(LakeShoreDevice)
     range_tests = List
 
     def load_additional_args(self, config):
@@ -67,81 +73,40 @@ class BaseLakeShoreController(CoreDevice):
         if items:
             self.range_tests = [RangeTest(*i) for i in items]
 
+            # just hardcoding now. should be in config file
+            dev_items = [1, 2, 3, 4]
+            self._load_devices(dev_items)
         return True
 
     def initialize(self, *args, **kw):
-        self.communicator.write_terminator = chr(10)  # line feed \n
-        return super(BaseLakeShoreController, self).initialize(*args, **kw)
+        return True
 
-    def test_connection(self):
-        self.tell('*CLS')
-        resp = self.ask('*IDN?')
-        return bool(IDN_RE.match(resp))
+    def _load_devices(self, items):
+        devs = []
+        for item in items:
+            # instead of a factory function
+            # just instantiate the object here
+            dev = LakeShoreDevice(address=item)
+            # dev = self._device_factory(item)
+        devs.append(dev)
+        self.devices = devs
 
-    def update(self, **kw):
-        self.input_a = self.read_input_a(**kw)
-        self.input_b = self.read_input_b(**kw)
-        self.setpoint1_readback = self.read_setpoint(1)
-        self.setpoint2_readback = self.read_setpoint(2)
-        return self.input_a
+    def setpoints_achieved(self, devs=None):
+        if devs is None:
+            devs = self.devices
 
-    def setpoints_achieved(self, tol=1):
-        v1 = self.read_input_a()
-        if abs(v1 - self.setpoint1) < tol:
-            self.debug('setpoint 1 achieved')
-            v2 = self.read_input_a()
-            if abs(v2 - self.setpoint2) < tol:
-                self.debug('setpoint 2 achieved')
-                return True
+        for d in devs:
+            if not dev.setpoint_achieved(self):
+                return False
+        else:
+            return True
 
     @get_float(default=0)
-    def read_setpoint(self, output, verbose=False):
-        return self.ask('SETP? {}'.format(output), verbose=verbose)
-
-    def set_setpoints(self, v1, v2):
-        # self.set_setpoint(v1, 1)
-        self.setpoint1 = v1
-        if v2 is not None:
-            self.setpoint2 = v2
-
-    def set_setpoint(self, v, output=1):
-        self.set_range(v, output)
-        self.tell('SETP {},{}'.format(output, v))
-
-    def set_range(self, v, output):
-        # if v <= 10:
-        #     self.tell('RANGE {},{}'.format(output, 1))
-        # elif 10 < v <= 30:
-        #     self.tell('RANGE {},{}'.format(output, 2))
-        # else:
-        #     self.tell('RANGE {},{}'.format(output, 3))
-
-        for r in self.range_tests:
-            ra = r.test(v)
-            if ra:
-                self.tell('RANGE {},{}'.format(output, ra))
-                break
-
-        sleep(1)
-
-    def read_input(self, v, **kw):
-        if isinstance(v, int):
-            v = 'ab'[v - 1]
-        return self._read_input(v, self.units, **kw)
-
-    def read_input_a(self, **kw):
-        return self._read_input('a', self.units, **kw)
-
-    def read_input_b(self, **kw):
-        return self._read_input('b', self.units, **kw)
-
-    @get_float(default=0)
-    def _read_input(self, tag, mode='C', verbose=False):
+    def read_input(self, tag, mode='C', verbose=False):
         return self.ask('{}RDG? {}'.format(mode, tag), verbose=verbose)
 
-    def _setpoint1_changed(self):
-        self.set_setpoint(self.setpoint1, 1)
+    # def _device_factory(self, address):
 
-    def _setpoint2_changed(self):
-        self.set_setpoint(self.setpoint2, 2)
+        # dev = LakeShoreDevice(address=address)
+        # return dev
 # ============= EOF =============================================

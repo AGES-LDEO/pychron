@@ -17,10 +17,10 @@ from __future__ import absolute_import
 from traitsui.api import Group, Item, UItem, HGroup, VGroup, spring, Spring
 
 from pychron.core.ui.lcd_editor import LCDEditor
-from pychron.hardware.lakeshore.base_controller import BaseLakeShoreController
+from pychron.hardware.lakeshore.base_controller import LakeShoreController
 
 
-class Model335TemperatureController(BaseLakeShoreController):
+class Model336TemperatureController(LakeShoreController):
     def get_control_group(self):
         grp = VGroup(Spring(height=10, springy=False), HGroup(Item('input_a', style='readonly', editor=LCDEditor(width=120, ndigits=6, height=30)),
                            Item('setpoint1'),
