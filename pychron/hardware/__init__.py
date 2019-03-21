@@ -55,8 +55,10 @@ HW_PACKAGE_MAP = {
     'TempHumMicroServer': 'pychron.hardware.environmental_probe',
     'AirTransducer': 'pychron.hardware.transducer',
     'NMGRLMagnetDumper': 'pychron.furnace.magnet_dumper',
-    
-    'Model335TemperatureController': 'pychron.hardware.lakeshore.model335'
+    'LamontFurnaceControl': 'pychron.hardware.labjack.ldeo_furnace',
+
+    'Model335TemperatureController': 'pychron.hardware.lakeshore.model335',
+    'Model336TemperatureController': 'pychron.hardware.lakeshore.model336'
     # 'ControlModule': 'pychron.hardware.fusions.vue_diode_control_module'
 }
 

@@ -24,6 +24,8 @@ import yaml
 
 from pychron.paths import paths
 
+STARTUP_MESSAGE_POSITION = (100, 300)
+
 SPECTROMETER_PROTOCOL = 'pychron.spectrometer.base_spectrometer_manager.BaseSpectrometerManager'
 ION_OPTICS_PROTOCOL = 'pychron.spectrometer.ion_optics_manager.IonOpticsManager'
 SCAN_PROTOCOL = 'pychron.spectrometer.scan_manager.ScanManager'
@@ -31,9 +33,18 @@ EL_PROTOCOL = 'pychron.extraction_line.extraction_line_manager.ExtractionLineMan
 DVC_PROTOCOL = 'pychron.dvc.dvc.DVC'
 FURNACE_PROTOCOL = 'pychron.furnace.furnace_manager.BaseFurnaceManager'
 
-TTF_FONTS = ['Courier New', 'Arial', 'Georgia', 'Impact', 'Verdana']
+TTF_FONTS = ['Andale Mono', 'Arial', 'Arial Black',
+             'Calibri', 'Cambria', 'Comic Sans MS', 'Consolas', 'Courier New',
+             'Georgia',
+             'Impact',
+             'Trebuchet MS',
+             'Verdana']
 FONTS = ['Helvetica'] + TTF_FONTS
 SIZES = [10, 6, 8, 9, 10, 11, 12, 14, 15, 18, 24, 36]
+
+from kiva.fonttools.font_manager import fontManager
+
+fontManager.defaultFamily = {'ttf': 'Arial', 'afm': 'Arial'}
 
 PLUSMINUS = '\N{Plus-minus sign}'
 SIGMA = '\N{Greek Small Letter Sigma}'
@@ -77,14 +88,23 @@ SUBGROUPINGS = [WEIGHTED_MEAN,
                 INTEGRATED, VALID_INTEGRATED, PLATEAU_INTEGRATED, DEFAULT_INTEGRATED,
                 ARITHMETIC_MEAN]
 
-SUBGROUPING_ATTRS = ('age', 'kca', 'kcl', 'rad40_percent', 'moles_k39', 'signal_k39')
+SUBGROUPING_ATTRS = ('age', 'kca', 'kcl', 'radiogenic_yield', 'moles_k39', 'signal_k39')
+
+FLECK_PLATEAU_DEFINITION = 'X contiguous Steps, Representing >Y% of the gas, Overlapping at 2 sigma'
+MAHON_PLATEAU_DEFINITION = 'X contiguous Steps, Representing >Y% of the gas, ' \
+                           'with all plateau steps yielding a valid MSWD'
+
+FLECK = 'Fleck 1977'
+MAHON = 'Mahon 1996'
 
 WEIGHTINGS = (NULL_STR, 'Volume', 'Variance')
-INTERPOLATE_TYPES = ['Preceding', 'Bracketing Interpolate', 'Bracketing Average']
+INTERPOLATE_TYPES = ['Preceding', 'Bracketing Interpolate', 'Bracketing Average', 'Succeeding']
 FIT_TYPES_INTERPOLATE = FIT_TYPES + INTERPOLATE_TYPES
 DELIMITERS = {',': 'comma', '\t': 'tab', ' ': 'space'}
-AGE_SCALARS = {'Ga': 1e9, 'Ma': 1e6, 'ka': 1e3, 'a': 1}
-AGE_MA_SCALARS = {'Ma': 1, 'ka': 1e-3, 'a': 1e-6, 'Ga': 1e3}
+
+# AGE_SCALARS = {'Ga': 1e9, 'Ma': 1e6, 'ka': 1e3, 'a': 1}
+# AGE_MA_SCALARS = {'Ma': 1, 'ka': 1e-3, 'a': 1e-6, 'Ga': 1e3}
+
 DESCENDING = 'Descending'
 ASCENDING = 'Ascending'
 AGE_SORT_KEYS = (NULL_STR, ASCENDING, DESCENDING)
@@ -188,10 +208,10 @@ ISOTOPX_DEFAULT_INTEGRATION_TIME = 1
 
 DEFAULT_INTEGRATION_TIME = 1
 
-K_DECAY_CONSTANTS = {'Min et al., 2000': (5.80e-11, 0, 4.884e-10, 0),
+K_DECAY_CONSTANTS = {'Min et al., 2000': (5.80e-11, 0, 4.883e-10, 0),
                      'Steiger & Jager 1977': (5.81e-11, 0, 4.962e-10, 0)}
 
-FLUX_CONSTANTS = {'FC Min': {'lambda_ec': [5.80e-11, 0], 'lambda_b': [4.884e-10, 0], 'monitor_age': 28.201},
+FLUX_CONSTANTS = {'FC Min': {'lambda_ec': [5.80e-11, 0], 'lambda_b': [4.883e-10, 0], 'monitor_age': 28.201},
                   'FC SJ': {'lambda_ec': [5.81e-11, 0], 'lambda_b': [4.962e-10, 0],
                             'monitor_age': 28.02}}
 
@@ -229,5 +249,42 @@ HIGH_GRADE_STEPS = ('frantz', 'heavy_liquid', 'gold_table', 'acid', 'pick')
 IMAGE_STEPS = ('mount', 'us_wand', 'eds', 'cl', 'bse', 'se')
 
 SAMPLE_PREP_STEPS = INITIAL_STEPS + HIGH_GRADE_STEPS + IMAGE_STEPS
+
+SAMPLE_METADATA = ('sample',
+                   'material',
+                   'grainsize',
+                   'project',
+                   'principal_investigator',
+                   'latitude',
+                   'longitude',
+                   'unit',
+                   'lithology',
+                   'lithology_class',
+                   'lithology_group',
+                   'lithology_type',
+                   'rlocation',
+                   'irradiation',
+                   'irradiation_level',
+                   'irradiation_position')
+
+EXTRACTION_ATTRS = ('weight', 'extract_device', 'tray', 'extract_value',
+                    'extract_units',
+                    # 'duration',
+                    # 'cleanup',
+                    'load_name',
+                    'load_holder',
+                    'extract_duration',
+                    'cleanup_duration',
+                    'pattern', 'beam_diameter', 'ramp_duration', 'ramp_rate')
+
+META_ATTRS = ('analysis_type', 'uuid', 'identifier', 'aliquot', 'increment',
+
+              'comment', 'mass_spectrometer',
+              'username', 'queue_conditionals_name',
+              'repository_identifier',
+              'acquisition_software',
+              'data_reduction_software', 'instrument_name', 'laboratory', 'experiment_queue_name', 'experiment_type',
+
+              ) + SAMPLE_METADATA
 
 # ============= EOF =============================================

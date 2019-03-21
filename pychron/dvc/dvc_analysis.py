@@ -31,9 +31,9 @@ from pychron.core.helpers.strtools import to_csv_str
 from pychron.dvc import dvc_dump, dvc_load, analysis_path, make_ref_list, get_spec_sha, get_masses, repository_path
 from pychron.experiment.utilities.environmentals import set_environmentals
 from pychron.experiment.utilities.identifier import make_aliquot_step, make_step
-from pychron.processing.analyses.analysis import Analysis, EXTRACTION_ATTRS, META_ATTRS
+from pychron.processing.analyses.analysis import Analysis
 from pychron.processing.isotope import Isotope
-from pychron.pychron_constants import INTERFERENCE_KEYS, NULL_STR, ARAR_MAPPING
+from pychron.pychron_constants import INTERFERENCE_KEYS, NULL_STR, ARAR_MAPPING, EXTRACTION_ATTRS, META_ATTRS
 
 
 class Blank:
@@ -129,7 +129,7 @@ class DVCAnalysis(Analysis):
         # self.collection_version = jd['collection_version']
         self._set_isotopes(jd)
 
-        if self.analysis_type.lower() == 'sample':
+        if self.analysis_type.lower() == 'sample' or not self.analysis_type:
             self.analysis_type = 'unknown'
         self.arar_mapping = jd.get('arar_mapping', ARAR_MAPPING)
 
@@ -181,13 +181,21 @@ class DVCAnalysis(Analysis):
 
         for modifier in modifiers:
             path = self._analysis_path(modifier=modifier)
-            if path and os.path.isfile(path):
-                jd = dvc_load(path)
-                func = getattr(self, '_load_{}'.format(modifier))
-                try:
-                    func(jd)
-                except BaseException as e:
-                    self.warning('Failed loading {}. error={}'.format(modifier, e))
+            if path:
+                if os.path.isfile(path):
+                    jd = dvc_load(path)
+                    if jd:
+                        func = getattr(self, '_load_{}'.format(modifier))
+                        try:
+                            func(jd)
+                        except BaseException as e:
+                            self.warning('Failed loading {}. path={}. error={}'.format(modifier, path, e))
+                            import traceback
+                            self.debug(traceback.format_exc())
+                    else:
+                        self.debug('path is empty. {}'.format(path))
+                else:
+                    self.debug('Non-existent path. {}'.format(path))
 
     def load_spectrometer_parameters(self, spec_sha):
         if spec_sha:
@@ -281,7 +289,14 @@ class DVCAnalysis(Analysis):
             return x.total_seconds() / (60. * 60 * 24)
 
         doses = chron.get_doses()
-        segments = [(pwr, convert_days(en - st), convert_days(analts - st), st, en)
+
+        def calc_ti(st, en):
+            t = st
+            if chron.use_irradiation_endtime:
+                t = en
+            return convert_days(analts - t)
+
+        segments = [(pwr, convert_days(en - st), calc_ti(st, en), st, en)
                     for pwr, st, en in doses
                     if st is not None and en is not None]
         d_o = 0
@@ -360,12 +375,11 @@ class DVCAnalysis(Analysis):
         isoks, dks = list(map(tuple, partition(keys, lambda x: x in sisos)))
 
         def update(d, i):
-            fd = i.filter_outliers_dict
             d.update(fit=i.fit, value=float(i.value), error=float(i.error),
                      n=i.n, fn=i.fn,
                      reviewed=reviewed,
                      include_baseline_error=i.include_baseline_error,
-                     filter_outliers_dict=fd)
+                     filter_outliers_dict=i.filter_outliers_dict)
 
         # save intercepts
         if isoks:
@@ -403,8 +417,12 @@ class DVCAnalysis(Analysis):
         sisos = self.isotopes
 
         for k in keys:
-            if k in isos and k in sisos:
-                blank = isos[k]
+            if isinstance(isos, dict):
+                blank = isos.get(k, {})
+            else:
+                blank = {}
+
+            if k in sisos:
                 siso = sisos[k]
                 if siso.temporary_blank is not None:
                     blank['value'] = v = float(siso.temporary_blank.value)
@@ -419,6 +437,19 @@ class DVCAnalysis(Analysis):
                     siso.blank.fit = f
 
         self._dump(isos, path)
+
+    def delete_icfactors(self, dkeys):
+        jd, path = self._get_json('icfactors')
+
+        remove = []
+        for k in jd:
+            if k not in dkeys:
+                remove.append(k)
+
+        for r in remove:
+            jd.pop(r)
+
+        self._dump(jd, path)
 
     def dump_icfactors(self, dkeys, fits, refs=None, reviewed=False):
         jd, path = self._get_json('icfactors')
@@ -452,11 +483,17 @@ class DVCAnalysis(Analysis):
 
             self.additional_peak_center_data = {k: unpack(pd['points'], jd['fmt'], decode=True)
                                                 for k, pd in jd.items() if k not in (refdet, 'fmt',
+                                                                                     'interpolation',
                                                                                      'reference_detector',
                                                                                      'reference_isotope')}
 
         self.peak_center = pd['center_dac']
         self.peak_center_reference_detector = refdet
+
+        interpolation = jd.get('interpolation', 'cubic')
+        self.peak_center_use_interpolation = bool(interpolation)
+        self.peak_center_interpolation_kind = interpolation
+        self.peak_center_reference_isotope = jd.get('reference_isotope')
 
     def _load_tags(self, jd):
         self.set_tag(jd)
@@ -526,7 +563,7 @@ class DVCAnalysis(Analysis):
             if isinstance(v, dict):
                 vv, ee = v['value'] or 0, v['error'] or 0
                 r = v.get('reviewed')
-                for iso in self.get_isotopes(key):
+                for iso in self.get_isotopes_for_detector(key):
                     iso.ic_factor = ufloat(vv, ee, tag='{} IC'.format(iso.name))
                     iso.ic_factor_reviewed = r
 
@@ -550,6 +587,8 @@ class DVCAnalysis(Analysis):
             i = Isotope(name, detector)
             i.set_units(v.get('units', 'fA'))
             i.set_time_zero(time_zero_offset)
+            i.set_detector_serial_id(v.get('serial_id', ''))
+
             return i
 
         try:

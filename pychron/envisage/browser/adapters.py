@@ -114,6 +114,7 @@ class AnalysisAdapter(BrowserAdapter):
                    ('UUID', 'uuid'),
                    ('Sample', 'sample'),
                    ('Project', 'project'),
+                   ('Repository', 'repository_identifier'),
                    ('Packet', 'packet'),
                    ('Irradiation', 'irradiation_info'),
                    ('Tag', 'tag'),
@@ -195,7 +196,8 @@ class AnalysisAdapter(BrowserAdapter):
 
         select_actions = [Action(name='Same Identifier', action='select_same'),
                           Action(name='Same Attr', action='select_same_attr'),
-                          Action(name='Clear', action='clear_selection')]
+                          Action(name='Clear', action='clear_selection'),
+                          Action(name='Remove Others', action='remove_others')]
 
         actions = [Action(name='Configure', action='configure_analysis_table'),
                    Action(name='Unselect', action='unselect_analyses'),
@@ -246,7 +248,7 @@ class InterpretedAgeAdapter(TabularAdapter):
                ('Age', 'age'),
                (PLUSMINUS_ONE_SIGMA, 'age_err'),
                ('AgeKind', 'age_kind'),
-               ('AgeErroKind', 'age_error_kind')]
+               ('AgeErrorKind', 'age_error_kind')]
 
     font = 'arial 10'
 

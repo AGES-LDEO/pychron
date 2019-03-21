@@ -123,26 +123,37 @@ class AutomatedRunSpec(HasTraits):
     # ===========================================================================
     # info
     # ===========================================================================
-    weight = Float
-    comment = Str
+    weight = 0
+    comment = ''
 
     # ===========================================================================
     # display only
     # ===========================================================================
-    project = Str
-    principal_investigator = Str
-    sample = Str
-    irradiation = Str
-    irradiation_level = Str
-    irradiation_position = Int
-    material = Str
-    data_reduction_tag = Str
+    project = ''
+    principal_investigator = ''
+    sample = ''
+    irradiation = ''
+    irradiation_level = ''
+    irradiation_position = ''
+    material = ''
+    grainsize = ''
+    latitude = ''
+    longitude = ''
+    lithology = ''
+    lithology_class = ''
+    lithology_group = ''
+    lithology_type = ''
+
+    data_reduction_tag = ''
     result_str = ''
 
     branch = 'master'
 
+    position_j = 0
+    position_jerr = 0
     uage = None
     v39 = None
+    display_k3739_mode = ''
 
     _estimated_duration = 0
     _changed = False
@@ -177,7 +188,8 @@ class AutomatedRunSpec(HasTraits):
         result.analysis_timestamp = datetime.now()
         result.isotope_group = arun.isotope_group
         result.tripped_conditional = arun.tripped_conditional
-
+        if arun.peak_center:
+            result.centering_results = arun.peak_center.get_results()
         self.result = result
 
     def is_detector_ic(self):

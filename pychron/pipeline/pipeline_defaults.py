@@ -107,6 +107,7 @@ INVERSE_ISOCHRON = """
 required:
 nodes:
   - klass: UnknownNode
+  - klass: GroupingNode
   - klass: InverseIsochronNode
 """
 
@@ -116,6 +117,23 @@ nodes:
   - klass: UnknownNode
   - klass: GroupingNode
   - klass: SpectrumNode
+"""
+
+COMPOSITE = """
+required:
+nodes:
+  - klass: UnknownNode
+  - klass: GroupingNode
+  - klass: CompositeNode
+"""
+
+FLUX_VISUALIZATION = """
+required:
+nodes:
+  - klass: FindFluxMonitorMeansNode
+    # level: K
+    # irradiation: NM-300
+  - klass: FluxVisualizationNode
 """
 
 VERTICAL_FLUX = """
@@ -241,6 +259,13 @@ required:
 nodes:
   - klass: UnknownNode
   - klass: CSVAnalysesExportNode
+"""
+
+CSV_RAW_DATA_EXPORT = """
+required:
+nodes:
+  - klass: UnknownNode
+  - klass: CSVRawDataExportNode
 """
 
 CA_CORRECTION_FACTORS = """

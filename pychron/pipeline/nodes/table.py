@@ -18,10 +18,11 @@ import os
 
 from apptools.preferences.preference_binding import bind_preference
 from traits.api import HasTraits, List, Enum, Bool, Str
-from traitsui.api import View, UItem, Item, TableEditor, ObjectColumn, VGroup
+from traitsui.api import UItem, Item, TableEditor, ObjectColumn, VGroup
 from traitsui.extras.checkbox_column import CheckboxColumn
 
 from pychron.core.helpers.iterfuncs import groupby_group_id
+from pychron.core.helpers.traitsui_shortcuts import okcancel_view
 from pychron.paths import paths
 from pychron.persistence_loggable import PersistenceMixin
 from pychron.pipeline.editors.interpreted_age_table_editor import InterpretedAgeTableEditor
@@ -29,9 +30,8 @@ from pychron.pipeline.nodes.data import BaseDVCNode
 from pychron.pipeline.nodes.group_age import GroupAgeNode
 from pychron.processing.analyses.analysis_group import InterpretedAgeGroup
 from pychron.pychron_constants import PLUSMINUS_NSIGMA, AIR, BLANK_TYPES, UNKNOWN
-
-
 # ============= enthought library imports =======================
+from pychron.utils import autodoc_helper
 
 
 class TableNode(BaseDVCNode):
@@ -86,8 +86,7 @@ class XLSXAnalysisTableNode(AnalysisTableNode):
     #     self.set_groups(state)
 
 
-class TableOptions(HasTraits, PersistenceMixin):
-    pass
+TableOptions = autodoc_helper('TableOptions', (HasTraits, PersistenceMixin))
 
 
 class AnalysisTableOptions(TableOptions):
@@ -153,14 +152,13 @@ class InterpretedAgeTableOptions(TableOptions):
 
         sigma = VGroup(Item('age_nsigma'), Item('kca_nsigma'))
 
-        v = View(VGroup(UItem('columns', editor=TableEditor(columns=cols, sortable=False)),
-                        sigma,
-                        ),
-                 title='Interpreted Age Table Options',
-                 resizable=True,
-                 height=500,
-                 width=300,
-                 buttons=['OK', 'Cancel'])
+        v = okcancel_view(VGroup(UItem('columns', editor=TableEditor(columns=cols, sortable=False)),
+                                 sigma,
+                                 ),
+                          title='Interpreted Age Table Options',
+                          resizable=True,
+                          height=500,
+                          width=300)
         return v
 
 

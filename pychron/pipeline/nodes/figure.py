@@ -25,11 +25,12 @@ from pychron.core.helpers.strtools import ratio
 from pychron.core.progress import progress_iterator
 from pychron.options.options_manager import IdeogramOptionsManager, OptionsController, SeriesOptionsManager, \
     SpectrumOptionsManager, InverseIsochronOptionsManager, VerticalFluxOptionsManager, XYScatterOptionsManager, \
-    RadialOptionsManager, RegressionSeriesOptionsManager
+    RadialOptionsManager, RegressionSeriesOptionsManager, FluxVisualizationOptionsManager, CompositeOptionsManager
 from pychron.options.views.views import view
+from pychron.pipeline.editors.flux_visualization_editor import FluxVisualizationEditor
 from pychron.pipeline.nodes.base import SortableNode
 from pychron.pipeline.plot.plotter.series import RADIOGENIC_YIELD, PEAK_CENTER, \
-    ANALYSIS_TYPE, AGE, LAB_TEMP, LAB_HUM
+    ANALYSIS_TYPE, AGE, LAB_TEMP, LAB_HUM, EXTRACT_VALUE, EXTRACT_DURATION, CLEANUP
 from pychron.pychron_constants import COCKTAIL, UNKNOWN, DETECTOR_IC
 
 
@@ -54,9 +55,10 @@ class FigureNode(SortableNode):
         super(FigureNode, self).reset()
         self.editors = {}
         self.editor = None
-        
+
     def refresh(self):
         for e in self.editors.values():
+            print('figure not refresh needed')
             e.refresh_needed = True
 
     def run(self, state):
@@ -90,6 +92,7 @@ class FigureNode(SortableNode):
                         unks = [u for u in unks if u.tag.lower() != 'skip']
 
                     editor.set_items(list(unks))
+                    print('reefejs meeded run')
                     editor.refresh_needed = True
                     # if hasattr(editor, 'component'):
                     #     editor.component.invalidate_and_redraw()
@@ -165,6 +168,40 @@ class VerticalFluxNode(FigureNode):
         editor.levels = state.levels
 
 
+class FluxVisualizationNode(FigureNode):
+    name = 'Flux Visualization'
+    editor_klass = FluxVisualizationEditor
+    plotter_options_manager_klass = FluxVisualizationOptionsManager
+    no_analyses_warning = False
+
+    def _options_view_default(self):
+        return view('Flux Options')
+
+    def run(self, state):
+        self.editor = editor = self._editor_factory()
+        state.editors.append(editor)
+        if not editor:
+            state.canceled = True
+            return
+
+        self.name = 'Flux Visualization {}'.format(state.irradiation, state.level)
+        geom = state.geometry
+
+        ps = state.monitor_positions
+
+        if ps:
+            po = self.plotter_options
+
+            editor.plotter_options = po
+            editor.geometry = geom
+            editor.irradiation = state.irradiation
+            editor.level = state.level
+            editor.holder = state.holder
+
+            editor.set_positions(ps)
+            editor.name = 'Flux Visualization: {}{}'.format(state.irradiation, state.level)
+
+
 class IdeogramNode(FigureNode):
     name = 'Ideogram'
     editor_klass = 'pychron.pipeline.plot.editors.ideogram_editor,IdeogramEditor'
@@ -215,7 +252,7 @@ class SeriesNode(FigureNode):
 
                             names.append('{}/{} DetIC'.format(vj.detector, vi.detector))
 
-            names.extend([PEAK_CENTER, ANALYSIS_TYPE, LAB_TEMP, LAB_HUM])
+            names.extend([PEAK_CENTER, ANALYSIS_TYPE, LAB_TEMP, LAB_HUM, EXTRACT_VALUE, EXTRACT_DURATION, CLEANUP])
 
             pom.set_names(names)
 
@@ -261,4 +298,11 @@ class RadialNode(FigureNode):
     editor_klass = 'pychron.pipeline.plot.editors.radial_editor,RadialEditor'
     plotter_options_manager_klass = RadialOptionsManager
 
+
+class CompositeNode(FigureNode):
+    name = 'Spectrum/Isochron'
+    editor_klass = 'pychron.pipeline.plot.editors.composite_editor,CompositeEditor'
+    plotter_options_manager_klass = CompositeOptionsManager
+    # configurable = False
+    # skip_configure = True
 # ============= EOF =============================================

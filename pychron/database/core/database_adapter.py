@@ -393,6 +393,14 @@ host= {}\nurl= {}'.format(self.name, self.username, self.host, self.public_url)
             except:
                 self.session.rollback()
 
+    def expire(self, i):
+        if self.session:
+            self.session.expire(i)
+
+    def expire_all(self):
+        if self.session:
+            self.session.expire_all()
+
     def commit(self):
         """
         commit the session
@@ -737,9 +745,15 @@ host= {}\nurl= {}'.format(self.name, self.username, self.host, self.public_url)
         f = getattr(q, func)
         try:
             return f()
+        except NoResultFound:
+            self.info('no results found for query -- {}'.format(compile_query(q)))
         except SQLAlchemyError as e:
             if self.verbose:
                 self.debug('_query exception {}'.format(e))
+
+            self.rollback()
+            self.reset_connection()
+            self.connect()
             if reraise:
                 raise e
 

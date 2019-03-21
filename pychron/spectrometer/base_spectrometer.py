@@ -64,6 +64,7 @@ class BaseSpectrometer(SpectrometerDevice):
 
     _prev_signals = None
     _no_intensity_change_cnt = 0
+    active_detectors = List
 
     def convert_to_axial(self, det, v):
         return v
@@ -94,7 +95,7 @@ class BaseSpectrometer(SpectrometerDevice):
             self.name = self.microcontroller.name
 
         self.magnet.finish_loading()
-
+        self.source.finish_loading()
         self.test_connection()
 
     def test_connection(self, force=True):
@@ -254,7 +255,7 @@ class BaseSpectrometer(SpectrometerDevice):
             if d < 0.15 and d < mi:
                 mi = d
                 found = k
-            # self.debug('map isotope {:0.3f} {} {:0.3f} {:0.3f} {} {}'.format(mass, k, v, d, mi, found))
+                # self.debug('map isotope {:0.3f} {} {:0.3f} {:0.3f} {} {}'.format(mass, k, v, d, mi, found))
 
         if found is None:
             found = 'Iso{:0.4f}'.format(mass)
@@ -290,11 +291,20 @@ class BaseSpectrometer(SpectrometerDevice):
                 det.isotope = isotope
 
                 self.debug('molweights={}'.format(self.molecular_weights))
-                index = det.index
+
                 try:
+                    index = det.index
+                    dets = self.active_detectors
+                    if not dets:
+                        dets = self.detectors
+                        idxs = [di.index for di in dets]
+                    else:
+                        idxs = range(len(dets))
+                        index = next((i for i, d in enumerate(dets) if d.index == index), 0)
+
                     nmass = self.map_mass(isotope)
-                    for di in self.detectors:
-                        mass = nmass - di.index + index
+                    for di, didx in enumerate(zip((dets, idxs))):
+                        mass = nmass - didx + index
                         isotope = self.map_isotope(mass)
                         self.debug('setting detector {} to {} ({})'.format(di.name, isotope, mass))
                         di.isotope = isotope
@@ -486,7 +496,7 @@ class BaseSpectrometer(SpectrometerDevice):
         for k, v in zip(keys, signals):
             det = self.get_detector(k)
             det.set_intensity(v)
-            gsignals.append(v*det.gain)
+            gsignals.append(v * det.gain)
 
         return keys, array(gsignals)
 

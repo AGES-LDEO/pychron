@@ -34,6 +34,7 @@ class PersistenceSpec(HasTraits):
     baseline_fods = Dict
 
     save_as_peak_hop = Bool(False)
+    experiment_type = Str
     experiment_id = Int
     sensitivity_multiplier = Float
     experiment_queue_name = Str
@@ -93,16 +94,16 @@ class PersistenceSpec(HasTraits):
     conditionals = List
     tripped_conditional = None
 
-    grain_polygon_blob = List
+    grain_polygons = List
 
     power_achieved = Float
     lab_temperatures = List
     lab_humiditys = List
     lab_pneumatics = List
 
-    lithographic_unit = Str
-    lat_long = Str
-    rock_type = Str
-    reference = Str
+    # lithographic_unit = Str
+    # lat_long = Str
+    # rock_type = Str
+    # reference = Str
 
 # ============= EOF =============================================

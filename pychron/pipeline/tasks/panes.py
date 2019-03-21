@@ -308,6 +308,7 @@ class PipelinePane(TraitsDockPane):
         teditor = TreeEditor(nodes=tnodes,
                              editable=False,
                              selected='selected_pipeline_template',
+                             dclick='dclicked_pipeline_template',
                              hide_root=True,
                              lines_mode='off')
 
@@ -357,6 +358,7 @@ class UnknownsAdapter(BaseAnalysesAdapter):
                    ('Run ID', 'record_id'),
                    ('Aliquot', 'aliquot'),
                    ('Step', 'step'),
+                   ('UUID', 'display_uuid'),
                    ('Sample', 'sample'),
                    ('Project', 'project'),
                    ('RepositoryID', 'repository_identifier'),
@@ -406,11 +408,11 @@ class UnknownsAdapter(BaseAnalysesAdapter):
                            grp)
 
     def _get_f_text(self):
-        r = floatfmt(self.item.F, n=4)
+        r = floatfmt(self.item.f, n=4)
         return r
 
     def _get_f_error_text(self):
-        r = floatfmt(self.item.F_err, n=4)
+        r = floatfmt(self.item.f_err, n=4)
         return r
 
     def _get_j_text(self):
@@ -461,6 +463,8 @@ class ReferencesAdapter(BaseAnalysesAdapter):
 
     all_columns = [('RunDate', 'rundate'),
                    ('Run ID', 'record_id'),
+                   ('Aliquot', 'aliquot'),
+                   ('UUID', 'display_uuid'),
                    ('Sample', 'sample'),
                    ('Project', 'project'),
                    ('RepositoryID', 'repository_identifier'),

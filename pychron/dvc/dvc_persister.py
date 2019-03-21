@@ -32,8 +32,8 @@ from pychron.dvc import dvc_dump, analysis_path, repository_path, NPATH_MODIFIER
 from pychron.experiment.automated_run.persistence import BasePersister
 from pychron.git_archive.repo_manager import GitRepoManager
 from pychron.paths import paths
-from pychron.processing.analyses.analysis import EXTRACTION_ATTRS, META_ATTRS
-from pychron.pychron_constants import DVC_PROTOCOL, LINE_STR, NULL_STR, ARGON_KEYS, ARAR_MAPPING
+from pychron.pychron_constants import DVC_PROTOCOL, LINE_STR, NULL_STR, ARGON_KEYS, ARAR_MAPPING, EXTRACTION_ATTRS, \
+    META_ATTRS
 
 
 def format_repository_identifier(project):
@@ -118,6 +118,7 @@ class DVCPersister(BasePersister):
         rblob = per_spec.response_blob  # time vs measured response
         oblob = per_spec.output_blob  # time vs %output
         sblob = per_spec.setpoint_blob  # time vs requested
+        gp = per_spec.grain_polygons
 
         if rblob:
             rblob = encode_blob(rblob)
@@ -126,12 +127,15 @@ class DVCPersister(BasePersister):
         if sblob:
             sblob = encode_blob(sblob)
 
+        if gp:
+            gp = [encode_blob(g) for g in gp]
+
         obj = {'measured_response': rblob,  # time vs
                'requested_output': oblob,
                'setpoint_stream': sblob,
                'snapshots': per_spec.snapshots,
                'videos': per_spec.videos,
-               'grain_polygon_blob': per_spec.grain_polygon_blob}
+               'grain_polygons': gp}
 
         pid = per_spec.pid
         if pid:
@@ -326,7 +330,7 @@ class DVCPersister(BasePersister):
                     obj = yaml.load(rfile)
                 except YAMLError:
                     pass
-                
+
                 for k in ARGON_KEYS:
                     if k not in obj:
                         self.warning('Invalid arar_mapping.yaml file. required keys={}'.format(ARGON_KEYS))
@@ -365,6 +369,8 @@ class DVCPersister(BasePersister):
         # save script names
         d['measurementName'] = ps.measurement_name
         d['extractionName'] = ps.extraction_name
+
+        d['experiment_type'] = self.per_spec.experiment_type
 
         db = self.dvc.db
         an = db.add_analysis(**d)
@@ -462,7 +468,6 @@ class DVCPersister(BasePersister):
             isos[key] = isod
 
             if iso.detector not in dets:
-                # bblob = base64.b64encode(iso.baseline.pack(endianness, as_hex=False))
                 bblob = encode_blob(iso.baseline.pack(endianness, as_hex=False))
                 baselines.append({'detector': iso.detector, 'blob': bblob})
                 dets[iso.detector] = {'deflection': per_spec.defl_dict.get(iso.detector),
@@ -534,7 +539,7 @@ class DVCPersister(BasePersister):
         akeys = self.arar_mapping
         if akeys is None:
             akeys = ARAR_MAPPING
-            
+
         obj['arar_mapping'] = akeys
 
         # save experiment
@@ -606,7 +611,8 @@ class DVCPersister(BasePersister):
             fmt = '>ff'
             obj = {'reference_detector': pc.reference_detector.name,
                    'reference_isotope': pc.reference_isotope,
-                   'fmt': fmt}
+                   'fmt': fmt,
+                   'interpolation': pc.interpolation_kind if pc.use_interpolation else ''}
 
             results = pc.get_results()
             if results:
@@ -619,6 +625,9 @@ class DVCPersister(BasePersister):
                                             'low_signal': result.low_signal,
                                             'center_signal': result.center_signal,
                                             'high_signal': result.high_signal,
+                                            'resolution': result.resolution,
+                                            'low_resolving_power': result.low_resolving_power,
+                                            'high_resolving_power': result.high_resolving_power,
                                             'points': points}
 
             dvc_dump(obj, p)
