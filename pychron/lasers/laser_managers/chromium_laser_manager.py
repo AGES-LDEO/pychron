@@ -74,6 +74,8 @@ class ChromiumLaserManager(EthernetLaserManager):
 
     def disable_laser(self):
         self.ask('laser.stop')
+        time.sleep(2)
+        self.set_laser_power(0)
         self.enabled = False
 
     def get_position(self):

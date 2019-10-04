@@ -291,6 +291,7 @@ class PatternExecutor(Patternable):
                     break
                 controller.linear_move(x, y, block=True,
                                        velocity=pattern.velocity)
+                time.sleep(1)
 
     def _execute_contour(self, controller, pattern):
         for ni in range(pattern.nsteps):

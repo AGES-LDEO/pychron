@@ -207,7 +207,7 @@ class MeasurementPyScript(ValvePyScript):
     @command_register
     def baselines(self, ncounts=1, mass=None, detector='',
                   use_dac=False,
-                  integration_time=1.04,
+                  integration_time=1,
                   settling_time=4, calc_time=False):
         """
         Measure the baseline for all detectors. Position ion beams using mass and detector
