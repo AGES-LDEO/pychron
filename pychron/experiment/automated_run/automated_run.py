@@ -28,6 +28,7 @@ import yaml
 from numpy import Inf, polyfit, linspace, polyval
 from traits.api import Any, Str, List, Property, \
     Event, Instance, Bool, HasTraits, Float, Int, Long, Tuple, Dict
+from traits.trait_errors import TraitError
 
 from pychron.core.helpers.filetools import add_extension
 from pychron.core.helpers.filetools import get_path
@@ -48,7 +49,7 @@ from pychron.globals import globalv
 from pychron.loggable import Loggable
 from pychron.paths import paths
 from pychron.pychron_constants import NULL_STR, MEASUREMENT_COLOR, \
-    EXTRACTION_COLOR, SCRIPT_KEYS, AR_AR
+    EXTRACTION_COLOR, SCRIPT_KEYS, AR_AR, NO_BLANK_CORRECT
 from pychron.spectrometer.base_spectrometer import NoIntensityChange
 
 DEBUG = False
@@ -245,8 +246,8 @@ class AutomatedRun(Loggable):
         if self.plot_panel:
             self.plot_panel.add_isotope_graph(name)
 
-    def py_generate_ic_mftable(self, detectors, refiso, peak_center_config=None, update_existing=True):
-        return self._generate_ic_mftable(detectors, refiso, peak_center_config, update_existing)
+    def py_generate_ic_mftable(self, detectors, refiso, peak_center_config=None, n=1):
+        return self._generate_ic_mftable(detectors, refiso, peak_center_config, n)
 
     def py_whiff(self, ncounts, conditionals, starttime, starttime_offset, series=0, fit_series=0):
         return self._whiff(ncounts, conditionals, starttime, starttime_offset, series, fit_series)
@@ -309,9 +310,12 @@ class AutomatedRun(Loggable):
                 try:
                     fi = fits[iso.name]
                 except KeyError:
-                    fi = 'linear'
-                    self.warning('No fit for "{}". defaulting to {}. '
-                                 'check the measurement script "{}"'.format(k, fi, self.measurement_script.name))
+                    try:
+                        fi = fits['{}{}'.format(iso.name, iso.detector)]
+                    except KeyError:
+                        fi = 'linear'
+                        self.warning('No fit for "{}". defaulting to {}. '
+                                     'check the measurement script "{}"'.format(k, fi, self.measurement_script.name))
 
             iso.set_fit_blocks(fi)
             self.debug('set "{}" to "{}"'.format(k, fi))
@@ -355,7 +359,8 @@ class AutomatedRun(Loggable):
         if self.spectrometer_manager:
             self.spectrometer_manager.spectrometer.ask(cmd)
 
-    def py_data_collection(self, obj, ncounts, starttime, starttime_offset, series=0, fit_series=0, group='signal', integration_time=None):
+    def py_data_collection(self, obj, ncounts, starttime, starttime_offset, series=0, fit_series=0, group='signal',
+                           integration_time=None):
         if not self._alive:
             return
 
@@ -557,36 +562,35 @@ class AutomatedRun(Loggable):
         #
         # self.plot_panel.analysis_view.load(self)
 
-    def py_peak_hop(self, cycles, counts, hops, mftable, starttime, starttime_offset,
-                    series=0, fit_series=0, group='signal'):
+    def py_peak_hop(self, cycles, counts, hops, mftable, starttime, starttime_offset, series=0, fit_series=0,
+                    group='signal'):
 
         if not self._alive:
             return
 
-        self.ion_optics_manager.set_mftable(mftable)
+        with self.ion_optics_manager.mftable_ctx(mftable):
 
-        is_baseline = False
-        self.peak_hop_collector.is_baseline = is_baseline
-        self.peak_hop_collector.fit_series_idx = fit_series
+            is_baseline = False
+            self.peak_hop_collector.is_baseline = is_baseline
+            self.peak_hop_collector.fit_series_idx = fit_series
 
-        if self.plot_panel:
-            self.plot_panel.trait_set(is_baseline=is_baseline, _ncycles=cycles, hops=hops)
-            self.plot_panel.show_isotope_graph()
+            if self.plot_panel:
+                self.plot_panel.trait_set(is_baseline=is_baseline, _ncycles=cycles, hops=hops)
+                self.plot_panel.show_isotope_graph()
 
-        # required for mass spec
-        self.persister.save_as_peak_hop = True
+            # required for mass spec
+            self.persister.save_as_peak_hop = True
 
-        self.is_peak_hop = True
+            self.is_peak_hop = True
 
-        check_conditionals = True
-        self._add_conditionals()
+            check_conditionals = True
+            self._add_conditionals()
 
-        ret = self._peak_hop(cycles, counts, hops, group,
-                             starttime, starttime_offset, series,
-                             check_conditionals)
+            ret = self._peak_hop(cycles, counts, hops, group,
+                                 starttime, starttime_offset, series,
+                                 check_conditionals)
 
-        self.is_peak_hop = False
-        self.ion_optics_manager.set_mftable()
+            self.is_peak_hop = False
 
         return ret
 
@@ -1372,7 +1376,7 @@ anaylsis_type={}
                     st = time.time()
                     try:
                         env[tag] = getattr(lclient, 'get_latest_{}'.format(tag))()
-                        self.debug('Get latest {}. elapsed: {}'.format(tag, time.time()-st))
+                        self.debug('Get latest {}. elapsed: {}'.format(tag, time.time() - st))
                     except BaseException as e:
                         self.debug('Get Labspy Environmentals: {}'.format(e))
                         self.debug_exception()
@@ -1382,7 +1386,7 @@ anaylsis_type={}
         else:
             self.debug('LabspyClient not enabled. Could not retrieve environmentals')
 
-        self.info('getting environmentals finished: total duration: {}'.format(time.time()-tst))
+        self.info('getting environmentals finished: total duration: {}'.format(time.time() - tst))
         return env
 
     def _start(self):
@@ -1512,7 +1516,12 @@ anaylsis_type={}
             self.debug('setting fod for {}= {}'.format(i.detector, fod))
 
     def _update_persister_spec(self, **kw):
-        self.persistence_spec.trait_set(**kw)
+        ps = self.persistence_spec
+        for k, v in kw.items():
+            try:
+                ps.trait_set(**{k: v})
+            except TraitError as e:
+                self.warning('failed setting persistence spec attr={}, value={} error={}'.format(k, v, e))
 
     def _persister_save_action(self, func, *args, **kw):
         self.debug('persistence save...')
@@ -1561,12 +1570,12 @@ anaylsis_type={}
         else:
             self.heading('Post Equilibration Finished unsuccessfully')
 
-    def _generate_ic_mftable(self, detectors, refiso, peak_center_config, update_existing):
+    def _generate_ic_mftable(self, detectors, refiso, peak_center_config, n):
         ret = True
         from pychron.experiment.ic_mftable_generator import ICMFTableGenerator
 
         e = ICMFTableGenerator()
-        if not e.make_mftable(self, detectors, refiso, peak_center_config, update_existing):
+        if not e.make_mftable(self, detectors, refiso, peak_center_config, n):
             ret = False
         return ret
 
@@ -1749,11 +1758,7 @@ anaylsis_type={}
         self.isotope_group.clear_error_components()
         self.isotope_group.clear_blanks()
 
-        cb = False
-        if (not self.spec.analysis_type.startswith('blank')
-                and not self.spec.analysis_type.startswith('background')):
-            cb = True
-
+        cb = False if any(self.spec.analysis_type.startswith(at) for at in NO_BLANK_CORRECT) else True
         for d in self._active_detectors:
             self.debug('setting isotope det={}, iso={}'.format(d.name, d.isotope))
             self.isotope_group.set_isotope(d.isotope, d.name, (0, 0), correct_for_blank=cb)
@@ -1930,8 +1935,8 @@ anaylsis_type={}
             # analyze the equilibration
             try:
                 self._analyze_equilibration()
-            except TypeError as e:
-                self.debug('AutomatedRun._equilibrate _analyze_equilibration error. TypeError={}'.format(e))
+            except BaseException as e:
+                self.debug('AutomatedRun._equilibrate _analyze_equilibration error. Exception={}'.format(e))
 
             self.heading('Equilibration Finished')
             if elm and inlet and close_inlet:
@@ -2021,8 +2026,7 @@ anaylsis_type={}
 
         self._load_previous()
 
-    def _set_hv_position(self, pos, detector, update_detectors=True,
-                         update_labels=True, update_isotopes=True):
+    def _set_hv_position(self, pos, detector, update_detectors=True, update_labels=True, update_isotopes=True):
         ion = self.ion_optics_manager
         if ion is not None:
             change = ion.hv_position(pos, detector, update_isotopes=update_isotopes)
@@ -2304,7 +2308,7 @@ anaylsis_type={}
         if starttime_offset > mi:
             min_ = -starttime_offset
 
-        graph.set_x_limits(min_=min_, max_=max_*1.1)
+        graph.set_x_limits(min_=min_, max_=max_ * 1.1)
 
         series = self.collector.series_idx
         for k, iso in self.isotope_group.items():
@@ -2361,7 +2365,7 @@ anaylsis_type={}
         if starttime_offset > mi:
             min_ = -starttime_offset
 
-        graph.set_x_limits(min_=min_, max_=max_*1.1)
+        graph.set_x_limits(min_=min_, max_=max_ * 1.1)
         regressing = grpname != 'sniff'
         series = self.collector.series_idx
         for k, iso in self.isotope_group.items():
@@ -2384,8 +2388,8 @@ anaylsis_type={}
                     graph.set_regressor(iso.regressor, idx)
 
         scnt, fcnt = (2, 1) if regressing else (1, 0)
-        self.debug(
-            '"{}" increment series count="{}" fit count="{}" regressing="{}"'.format(grpname, scnt, fcnt, regressing))
+        self.debug('"{}" increment series count="{}" '
+                   'fit count="{}" regressing="{}"'.format(grpname, scnt, fcnt, regressing))
 
         self.measurement_script.increment_series_counts(scnt, fcnt)
 

@@ -27,7 +27,7 @@ from git import Repo, GitCommandError
 from traits.api import Instance, Str, Set, List, provides, Bool, Int
 
 from pychron import json
-from pychron.core.helpers.filetools import remove_extension, list_subdirectories
+from pychron.core.helpers.filetools import remove_extension, list_subdirectories, list_directory
 from pychron.core.helpers.iterfuncs import groupby_key, groupby_repo
 from pychron.core.i_datastore import IDatastore
 from pychron.core.progress import progress_loader, progress_iterator, open_progress
@@ -48,7 +48,7 @@ from pychron.globals import globalv
 from pychron.loggable import Loggable
 from pychron.paths import paths, r_mkdir
 from pychron.processing.interpreted_age import InterpretedAge
-from pychron.pychron_constants import RATIO_KEYS, INTERFERENCE_KEYS
+from pychron.pychron_constants import RATIO_KEYS, INTERFERENCE_KEYS, STARTUP_MESSAGE_POSITION
 
 
 @provides(IDatastore)
@@ -89,7 +89,8 @@ class DVC(Loggable):
         self.debug('Initialize DVC')
 
         if not self.meta_repo_name:
-            self.warning_dialog('Need to specify Meta Repository name in Preferences')
+            self.warning_dialog('Need to specify Meta Repository name in Preferences',
+                                position=STARTUP_MESSAGE_POSITION)
             return
         try:
             self.open_meta_repo()
@@ -102,6 +103,18 @@ class DVC(Loggable):
 
         if self.db.connect():
             return True
+
+    def find_associated_identifiers(self, samples):
+        from pychron.dvc.associated_identifiers import AssociatedIdentifiersView
+
+        av = AssociatedIdentifiersView()
+        for s in samples:
+            dbids = self.db.get_irradiation_position_by_sample(s.name, s.material, s.grainsize,
+                                                               s.principal_investigator,
+                                                    s.project)
+            av.add_items(dbids)
+
+        av.edit_traits(kind='modal')
 
     def open_meta_repo(self):
         mrepo = self.meta_repo
@@ -475,6 +488,18 @@ class DVC(Loggable):
 
         self._save_j(irradiation, level, pos, identifier, j, e, mj, me, position_jerr, decay_constants, analyses,
                      options, add)
+
+    def save_csv_dataset(self, name, repository, lines):
+
+        repo = self.get_repository(repository)
+        root = os.path.join(repo.path, 'csv')
+        if not os.path.isdir(root):
+            os.mkdir(root)
+
+        p = os.path.join(root, '{}.csv'.format(name))
+        with open(p, 'w') as wfile:
+            wfile.writelines(lines)
+        return p
 
     def remove_irradiation_position(self, irradiation, level, hole):
         db = self.db
@@ -893,6 +918,10 @@ class DVC(Loggable):
         return self.meta_repo.get_production(irrad, name)
 
     # get
+    def get_csv_datasets(self, repo):
+        repo = self.get_repository(repo)
+        return list_directory(os.path.join(repo.path, 'csv'), extension='.csv', remove_extension=True)
+
     def get_local_repositories(self):
         return list_subdirectories(paths.repository_dataset_dir)
 
@@ -927,6 +956,8 @@ class DVC(Loggable):
                 if sparrow.connect():
                     for p in ps:
                         sparrow.insert_ia(p)
+                else:
+                    self.warning('Connection failed. Cannot add IAs to Sparrow')
 
             self.repository_commit(rid, '<IA> added interpreted ages {}'.format(','.join(ialabels)))
             return True

@@ -33,7 +33,8 @@ from pychron.experiment.utilities.environmentals import set_environmentals
 from pychron.experiment.utilities.identifier import make_aliquot_step, make_step
 from pychron.processing.analyses.analysis import Analysis
 from pychron.processing.isotope import Isotope
-from pychron.pychron_constants import INTERFERENCE_KEYS, NULL_STR, ARAR_MAPPING, EXTRACTION_ATTRS, META_ATTRS
+from pychron.pychron_constants import INTERFERENCE_KEYS, NULL_STR, ARAR_MAPPING, EXTRACTION_ATTRS, META_ATTRS, \
+    NO_BLANK_CORRECT
 
 
 class Blank:
@@ -379,7 +380,9 @@ class DVCAnalysis(Analysis):
                      n=i.n, fn=i.fn,
                      reviewed=reviewed,
                      include_baseline_error=i.include_baseline_error,
-                     filter_outliers_dict=i.filter_outliers_dict)
+                     filter_outliers_dict=i.filter_outliers_dict,
+                     user_excluded=i.user_excluded,
+                     outlier_excluded=i.outlier_excluded)
 
         # save intercepts
         if isoks:
@@ -387,11 +390,13 @@ class DVCAnalysis(Analysis):
             for k in isoks:
                 try:
                     iso = isos[k]
-                    siso = sisos[k]
-                    if siso:
-                        update(iso, siso)
                 except KeyError:
-                    pass
+                    iso = {}
+                    isos[k] = iso
+
+                siso = sisos[k]
+                if siso:
+                    update(iso, siso)
 
             self._dump(isos, path)
 
@@ -528,6 +533,7 @@ class DVCAnalysis(Analysis):
                 if fod:
                     i.set_filter_outliers_dict(**fod)
                 i.set_fit(v['fit'], notify=False)
+                i.set_user_excluded(v.get('user_excluded'))
                 i.reviewed = v.get('reviewed', False)
 
     def _load_value_error(self, item, obj):
@@ -583,12 +589,14 @@ class DVCAnalysis(Analysis):
         if not isos:
             return
 
+        cb = False if any(self.analysis_type.startswith(at) for at in NO_BLANK_CORRECT) else True
+
         def factory(name, detector, v):
             i = Isotope(name, detector)
             i.set_units(v.get('units', 'fA'))
             i.set_time_zero(time_zero_offset)
             i.set_detector_serial_id(v.get('serial_id', ''))
-
+            i.correct_for_blank = cb
             return i
 
         try:

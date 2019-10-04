@@ -90,7 +90,6 @@ class BaseMeasurement(object):
             xs, ys = self._unpack_blob(blob)
         except (ValueError, TypeError, IndexError, AttributeError) as e:
             self.unpack_error = e
-            print('unpack', self.name, e)
             return
 
         if n_only:
@@ -185,7 +184,10 @@ class IsotopicMeasurement(BaseMeasurement):
 
     @property
     def efit(self):
-        return '{}_{}'.format(self.fit, self.error_type)
+        fit = self.fit
+        if fit and '_' not in fit:
+            fit = '{}_{}'.format(fit, self.error_type)
+        return fit
 
     @property
     def rsquared(self):
@@ -211,6 +213,24 @@ class IsotopicMeasurement(BaseMeasurement):
     @fn.setter
     def fn(self, v):
         self._fn = v
+
+    @property
+    def user_excluded(self):
+        if self._regressor:
+            return [int(i) for i in self._regressor.user_excluded]
+
+    @property
+    def outlier_excluded(self):
+        if self._regressor:
+            return [int(i) for i in self._regressor.outlier_excluded]
+
+    def set_user_excluded(self, ue):
+        if ue:
+            reg = self._regressor
+            if not reg:
+                reg = self.regressor
+
+            reg.user_excluded = ue
 
     def set_filtering(self, d):
         self.filter_outliers_dict = d.copy()

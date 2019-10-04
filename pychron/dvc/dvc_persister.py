@@ -63,9 +63,11 @@ class DVCPersister(BasePersister):
     save_log_enabled = Bool(False)
     arar_mapping = None
 
-    def __init__(self, *args, **kw):
+    def __init__(self, bind=True, *args, **kw):
         super(DVCPersister, self).__init__(*args, **kw)
-        bind_preference(self, 'use_uuid_path_name', 'pychron.experiment.use_uuid_path_name')
+        if bind:
+            bind_preference(self, 'use_uuid_path_name', 'pychron.experiment.use_uuid_path_name')
+
         self._load_arar_mapping()
 
     def per_spec_save(self, pr, repository_identifier=None, commit=False, commit_tag=None, push=True):
@@ -120,17 +122,17 @@ class DVCPersister(BasePersister):
         sblob = per_spec.setpoint_blob  # time vs requested
         gp = per_spec.grain_polygons
 
-        if rblob:
+        if rblob is not None:
             rblob = encode_blob(rblob)
-        if oblob:
+        if oblob is not None:
             oblob = encode_blob(oblob)
-        if sblob:
+        if sblob is not None:
             sblob = encode_blob(sblob)
 
         if gp:
             gp = [encode_blob(g) for g in gp]
 
-        obj = {'measured_response': rblob,  # time vs
+        obj = {'measured_response': rblob,
                'requested_output': oblob,
                'setpoint_stream': sblob,
                'snapshots': per_spec.snapshots,

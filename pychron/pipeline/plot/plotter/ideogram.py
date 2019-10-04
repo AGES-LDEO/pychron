@@ -28,7 +28,6 @@ from pyface.message_dialog import warning
 from traits.api import Array
 from uncertainties import nominal_value, std_dev
 
-from pychron.core.codetools.inspection import caller
 from pychron.core.helpers.formatting import floatfmt
 from pychron.core.stats.peak_detection import fast_find_peaks
 from pychron.core.stats.probability_curves import cumulative_probability, kernel_density
@@ -494,7 +493,6 @@ class Ideogram(BaseArArFigure):
         gid = ogid + 1
 
         opt = self.options
-        we = opt.nsigma
         text = ''
         if opt.display_mean:
             total_n = self.xs.shape[0]
@@ -509,16 +507,13 @@ class Ideogram(BaseArArFigure):
             text = self._make_mean_label(wm, we * opt.nsigma, n, total_n, mswd_args,
                                          display_n=opt.display_mean_n)
 
-        # group = self.options.get_group(self.group_id)
-        # color = group.color
-
         plotkw = opt.get_plot_dict(ogid, self.subgroup_id)
 
         m = MeanIndicatorOverlay(component=line,
                                  x=wm,
                                  y=20 * gid,
                                  error=we,
-                                 nsgima=opt.nsigma,
+                                 nsigma=opt.nsigma,
                                  color=plotkw['color'],
                                  visible=opt.display_mean_indicator,
                                  id='mean_{}'.format(self.group_id))
@@ -553,9 +548,13 @@ class Ideogram(BaseArArFigure):
         #     self.update_graph_metadata(None, name, old, new)
 
     def update_graph_metadata(self, obj, name, old, new):
+        if hasattr(obj, 'suppress_update') and obj.suppress_update:
+            return
+
         ans = self.sorted_analyses
         sel = obj.metadata.get('selections', [])
         self._set_selected(ans, sel)
+
         self._rebuild_ideo(sel)
         self.recalculate_event = True
 
@@ -569,11 +568,9 @@ class Ideogram(BaseArArFigure):
         h = d.max()
         return 0, h
 
-    @caller
     def replot(self):
         self._rebuild_ideo()
 
-    @caller
     def _rebuild_ideo(self, sel=None):
         graph = self.graph
         gid = self.group_id + 1

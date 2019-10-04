@@ -69,7 +69,7 @@ class IdeogramEditor(InterpretedAgeEditor):
 
     @on_trait_change('figure_model:panels:figures:recalculate_event')
     def _handle_recalculate(self):
-        print('recaladifaasdfsds')
+        self._get_component_hook()
 
     def _get_component_hook(self, model=None):
         if model is None:
@@ -89,7 +89,7 @@ class IdeogramEditor(InterpretedAgeEditor):
 
             # ags = [pp.analysis_group for pp in p.figures]
             if self.plotter_options.show_results_table:
-                r = IdeogramResultsTable(ags)
+                r = IdeogramResultsTable(ags, self.plotter_options.nsigma)
                 rs.append(r)
 
             if self.plotter_options.show_ttest_table and len(ags) > 1:
