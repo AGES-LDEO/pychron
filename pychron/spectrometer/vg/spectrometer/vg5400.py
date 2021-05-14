@@ -13,10 +13,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===============================================================================
-
+import time
+from datetime import datetime
 # ============= enthought library imports =======================
 from __future__ import absolute_import
 
+from pychron.pychron_constants import VG_DEFAULT_INTEGRATION_TIME, VG_INTEGRATION_TIMES
 from pychron.spectrometer.vg.spectrometer.analyzer import SystemAnalyzer
 from pychron.spectrometer.vg.detector.vg5400 import VG5400Detector
 from pychron.spectrometer.vg.magnet.vg5400 import VG5400Magnet
@@ -26,10 +28,23 @@ from pychron.spectrometer.vg.spectrometer.base import VGSpectrometer
 
 class VG5400Spectrometer(VGSpectrometer):
 
+    integration_times = List(ISOTOPX_INTEGRATION_TIMES)
+
     analyzer_klass = SystemAnalyzer
     detector_klass = VG5400Detector
     magnet_klass = VG5400Magnet
     source_klass = VG5400Source
+
+    _read_enabled = True
+
+    def make_configuration_dict(self):
+        return {}
+
+    def make_gains_dict(self):
+        return {}
+
+    def make_deflection_dict(self):
+        return {}
 
     def finish_loading(self):
         super(VG5400Spectrometer, self).finish_loading()
@@ -71,3 +86,104 @@ class VG5400Spectrometer(VGSpectrometer):
         else:
             self.debug('Warning: no ranges defined for magnet DAC. Using linear equation for full range.')
             self.magnet.ranges.append([0, 6, 0, 10922, 0])
+
+    def start(self):
+        self.set_integration_time(1, force=True)
+
+    def read_intensities(self, timeout=60, trigger=False, detector='Faraday', verbose=False):
+        self._read_enabled = True
+        verbose = True
+
+        if verbose:
+            self.debug('read intensities {}'.format(detector))
+        resp = True
+        if trigger:
+            resp = self.trigger_acq()
+            if resp is not None:
+                time.sleep(self.integration_time)
+
+        keys = []
+        signals = []
+        collection_time = None
+        inc = False
+
+        if resp is not None:
+            keys = self.detector_names[::-1]
+            while self._read_enabled:
+                line = self.readline(detector=detector, verbose=True)
+
+                if verbose:
+                    self.debug('raw: {}'.format(line))
+
+                if line is None:
+                    break
+
+                if line and detector=='Faraday':
+                    try:
+                        args = line.split()
+
+                        collection_time = datetime.now()
+
+                        keys = ['F']
+
+                        signals = [float(args[1])]
+
+                    except BaseException as e:
+                        self.debug('read intensities error={}'.format(e))
+
+                if line and detector=='ICM':
+                    try:
+                        args = line.split()
+
+                        collection_time = datetime.now()
+
+                        keys = ['ICM']
+
+                        signals = [float(args[1])]
+
+                    except BaseException as e:
+                        self.debug('read intensities error={}'.format(e))
+
+        if verbose:
+            self.debug('collection time: {}'.format(collection_time))
+            self.debug('keys: {}'.format(keys))
+            self.debug('signals: {}'.format(signals))
+
+        return keys, signals, collection_time, True
+
+    def readline(self, detector='Faraday', verbose=False):
+        if verbose:
+            self.debug('readline')
+        st = time.time()
+        ds = ''
+        while 1:
+            if time.time() - st > 3 * self.integration_time:
+                if verbose:
+                    self.debug('readline timeout. raw={}'.format(ds))
+                return
+
+            try:
+                ds += self.read(detector=detector)
+            except BaseException:
+                self.debug_exception()
+                self.debug(f'data left: {ds}')
+
+            if '#\r\n' in ds:
+                ds = ds.split('#\r\n')[0]
+                return ds
+
+    def get_update_period(self, it=None, is_scan=False):
+
+    def read_integration_time(self):
+        return self.integration_time
+
+    def set_integration_time(self, it, force=False):
+
+    def _get_simulation_data(self):
+        signals = [1, 100]  # + random(6)
+        keys = ['F', 'ICM']
+        return keys, signals, None
+
+    def _integration_time_default(self):
+        self.default_integration_time = VG_DEFAULT_INTEGRATION_TIME
+        return VG_DEFAULT_INTEGRATION_TIME
